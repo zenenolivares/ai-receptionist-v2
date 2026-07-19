@@ -5,6 +5,20 @@ require("dotenv").config();
 
 const app = express();
 
+// This is the endpoint Twilio will call
+app.post("/voice", (req, res) => {
+  res.set("Content-Type", "text/xml");
+
+  res.send(`
+<Response>
+    <Say voice="alice">
+        Hello! Thanks for calling. Our AI receptionist will be available shortly.
+    </Say>
+</Response>
+  `);
+});
+
+// This is just for testing in your browser
 app.get("/", (req, res) => {
   res.send("AI Receptionist is running!");
 });
@@ -14,14 +28,14 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 wss.on("connection", (ws) => {
-  console.log("Twilio connected.");
+  console.log("WebSocket connected.");
 
   ws.on("message", (message) => {
     console.log("Received:", message.toString());
   });
 
   ws.on("close", () => {
-    console.log("Twilio disconnected.");
+    console.log("WebSocket disconnected.");
   });
 });
 
