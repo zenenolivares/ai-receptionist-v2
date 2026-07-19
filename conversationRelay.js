@@ -7,7 +7,7 @@ const openai = new OpenAI({
 });
 
 // Replace this with your n8n webhook URL
-const N8N_WEBHOOK = "https://zenenolivares.app.n8n.cloud/webhook-test/hvac-lead";
+const N8N_WEBHOOK = "https://zenenolivares.app.n8n.cloud/webhook/hvac-lead";
 
 
 function setupConversationRelay(server) {
