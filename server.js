@@ -17,11 +17,15 @@ app.use(express.json());
 
 // Twilio Voice Webhook
 app.post("/voice", (req, res) => {
-  console.log("VOICE WEBHOOK HIT");
-  
   res.type("text/xml");
 
   res.send(`
+<Response>
+  <Say voice="alice">Hello! Your test is working.</Say>
+  <Pause length="60"/>
+</Response>
+  `);
+});
 <Response>
   <Connect>
     <ConversationRelay
