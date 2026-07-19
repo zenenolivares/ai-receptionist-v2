@@ -1,36 +1,57 @@
 const WebSocket = require("ws");
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 function setupConversationRelay(server) {
   const wss = new WebSocket.Server({ noServer: true });
 
   server.on("upgrade", (request, socket, head) => {
-    console.log("WebSocket upgrade request:", request.url);
-
     if (request.url === "/conversation-relay") {
-      console.log("Accepting ConversationRelay connection");
-
       wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit("connection", ws, request);
+        wss.emit("connection", ws);
       });
-    } else {
-      socket.destroy();
     }
   });
 
   wss.on("connection", (ws) => {
     console.log("Twilio ConversationRelay connected");
 
-    ws.on("message", (message) => {
-      console.log("RAW MESSAGE:");
-      console.log(message.toString());
+    ws.on("message", async (message) => {
+      const data = JSON.parse(message.toString());
+
+      console.log(data);
+
+      if (data.type === "prompt") {
+
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are an AI receptionist. Be friendly, professional, and help callers schedule appointments or answer questions."
+            },
+            {
+              role: "user",
+              content: data.voicePrompt
+            }
+          ]
+        });
+
+        const text = response.choices[0].message.content;
+
+        ws.send(JSON.stringify({
+          type: "text",
+          token: text
+        }));
+      }
     });
 
     ws.on("close", () => {
       console.log("Twilio disconnected");
-    });
-
-    ws.on("error", (err) => {
-      console.log("WebSocket error:", err);
     });
   });
 }
