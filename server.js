@@ -1,7 +1,11 @@
+const OpenAI = require("openai");
 const express = require("express");
 const http = require("http");
 const WebSocket = require("ws");
 require("dotenv").config();
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const app = express();
 
