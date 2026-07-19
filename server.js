@@ -23,7 +23,7 @@ app.post("/voice", (req, res) => {
 <Response>
   <Connect>
     <ConversationRelay
-      url="wss://ai-receptionist-v2-sywe.onrender.com"
+      url="wss://ai-receptionist-v2-sywe.onrender.com/conversation-relay"
       welcomeGreeting="Hello! Thanks for calling. How can I help you today?" />
   </Connect>
 </Response>
