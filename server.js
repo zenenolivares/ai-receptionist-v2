@@ -17,6 +17,8 @@ app.use(express.json());
 
 // Twilio Voice Webhook
 app.post("/voice", (req, res) => {
+  console.log("VOICE WEBHOOK HIT");
+  
   res.type("text/xml");
 
   res.send(`
