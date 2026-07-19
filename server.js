@@ -11,15 +11,18 @@ const openai = new OpenAI({
 
 const app = express();
 
-// Twilio webhook
+// Twilio Voice Webhook
 app.post("/voice", (req, res) => {
-  res.set("Content-Type", "text/xml");
+  res.type("text/xml");
 
   res.send(`
+<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="alice">
-    Hello! Thanks for calling. Our A.I. receptionist will be with you shortly.
-  </Say>
+  <Connect>
+    <ConversationRelay
+      url="wss://ai-receptionist-v2-sywe.onrender.com"
+      welcomeGreeting="Hello! Thanks for calling. How can I help you today?" />
+  </Connect>
 </Response>
   `);
 });
