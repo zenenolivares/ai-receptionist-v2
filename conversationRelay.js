@@ -1,37 +1,41 @@
 const WebSocket = require("ws");
 
 function setupConversationRelay(server) {
-  const wss = new WebSocket.Server({
-    server,
-    path: "/conversation-relay",
+  const wss = new WebSocket.Server({ noServer: true });
+
+  server.on("upgrade", (request, socket, head) => {
+    if (request.url === "/conversation-relay") {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit("connection", ws, request);
+      });
+    }
   });
 
   wss.on("connection", (ws) => {
     console.log("Twilio ConversationRelay connected");
 
     ws.on("message", (message) => {
+      console.log("Message from Twilio:");
+      console.log(message.toString());
+
       const data = JSON.parse(message.toString());
 
-      console.log("Twilio event:", data);
-
       if (data.type === "setup") {
-        console.log("Call started:", data);
+        console.log("Call setup received");
       }
 
       if (data.type === "prompt") {
-        console.log("Caller said:", data.voicePrompt);
-        
         ws.send(
           JSON.stringify({
             type: "text",
-            token: "Thanks for calling. I am connecting you now.",
+            token: "I am your AI receptionist. How can I help you today?",
           })
         );
       }
     });
 
     ws.on("close", () => {
-      console.log("ConversationRelay disconnected");
+      console.log("Twilio disconnected");
     });
   });
 }
