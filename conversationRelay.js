@@ -1,9 +1,14 @@
 const WebSocket = require("ws");
 const OpenAI = require("openai");
+const axios = require("axios");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Replace this with your n8n webhook URL
+const N8N_WEBHOOK = "https://zenenolivares.app.n8n.cloud/webhook-test/hvac-lead";
+
 
 function setupConversationRelay(server) {
   const wss = new WebSocket.Server({ noServer: true });
@@ -16,114 +21,152 @@ function setupConversationRelay(server) {
     }
   });
 
+
   wss.on("connection", (ws) => {
     console.log("Twilio ConversationRelay connected");
+
+    let conversation = [];
+
 
     ws.on("message", async (message) => {
       try {
         const data = JSON.parse(message.toString());
 
-        console.log("Twilio message:", data);
+        console.log("Twilio:", data);
+
 
         if (data.type === "prompt") {
 
+          conversation.push({
+            role: "user",
+            content: data.voicePrompt
+          });
+
+
           const response = await openai.chat.completions.create({
+
             model: "gpt-4o-mini",
 
             messages: [
               {
                 role: "system",
                 content: `
-You are Sarah, the AI receptionist for CoolFlow HVAC, a professional HVAC company serving customers in Texas.
+You are Sarah, the AI receptionist for CoolFlow HVAC, a professional HVAC company serving Texas.
 
-Your job is to answer incoming calls, qualify HVAC leads, and help customers get service quickly.
+Your job:
+- Answer customer calls
+- Qualify HVAC leads
+- Collect customer information
+- Help schedule service
 
-PERSONALITY:
+Personality:
 - Friendly
 - Professional
 - Calm
+- Natural
 - Helpful
-- Natural sounding
-- Speak like a real receptionist, not a robot
 
-YOUR GOALS:
-1. Understand why the customer is calling.
-2. Determine how urgent the problem is.
-3. Collect customer information.
-4. Make the customer feel taken care of.
-5. Prepare information for a technician callback.
-
-ALWAYS COLLECT:
+You must collect:
 - Customer name
 - Phone number
 - Address
-- Problem description
+- HVAC problem
 - Urgency level
 - Preferred callback time
 
-HVAC QUESTIONS TO ASK WHEN APPROPRIATE:
-- "Is your AC completely not working, or is it just having trouble keeping up?"
-- "Is your system making any unusual noises?"
-- "Is there any water leaking from the unit?"
-- "Do you know how old the system is?"
+Ask only one question at a time.
 
-URGENT SITUATIONS:
-Treat as urgent if:
-- AC is completely out during extreme heat
-- There is water leaking
-- There is a burning smell
-- There is a possible electrical issue
+Important HVAC questions:
+- Is the AC completely not working?
+- Is there water leaking?
+- Is there a burning smell?
+- How old is the system?
 
-CONVERSATION RULES:
-- Keep answers short because this is a phone call.
-- Ask one question at a time.
-- Do not overwhelm the caller.
-- Never mention ChatGPT, OpenAI, or being a language model.
-- If you don't know something, tell the caller a technician will follow up.
+Treat these as urgent:
+- AC completely broken during extreme heat
+- Electrical smell
+- Active leaking
+- Safety concerns
 
-Example:
+Never mention ChatGPT or OpenAI.
 
-Caller:
-"My AC stopped working."
+When you have collected all information, include this exact phrase at the end:
 
-You:
-"I'm sorry you're dealing with that. I can help get someone out to you. Can I start by getting your name?"
+LEAD_COMPLETE
+
 `
               },
-              {
-                role: "user",
-                content: data.voicePrompt
-              }
+
+              ...conversation
             ]
           });
 
+
           const text = response.choices[0].message.content;
 
-          ws.send(
-            JSON.stringify({
-              type: "text",
-              token: text
-            })
-          );
+
+          conversation.push({
+            role: "assistant",
+            content: text
+          });
+
+
+          // Send AI response back to caller
+          ws.send(JSON.stringify({
+            type: "text",
+            token: text
+          }));
+
+
+          // Send lead to n8n once complete
+          if (text.includes("LEAD_COMPLETE")) {
+
+            try {
+
+              await axios.post(N8N_WEBHOOK, {
+
+                business: "CoolFlow HVAC",
+
+                conversation: conversation,
+
+                timestamp: new Date()
+
+              });
+
+
+              console.log("Lead sent to n8n");
+
+            } catch (error) {
+
+              console.log(
+                "n8n webhook error:",
+                error.message
+              );
+
+            }
+          }
+
         }
 
-      } catch (error) {
-        console.error("AI Error:", error);
+      } catch(error) {
 
-        ws.send(
-          JSON.stringify({
-            type: "text",
-            token: "I'm sorry, I'm having trouble right now. Let me get someone to help you."
-          })
+        console.log(
+          "Conversation error:",
+          error.message
         );
+
       }
     });
+
 
     ws.on("close", () => {
       console.log("Twilio disconnected");
     });
+
   });
+
 }
+
 
 module.exports = {
   setupConversationRelay,
