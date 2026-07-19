@@ -1,47 +1,38 @@
-const OpenAI = require("openai");
 const express = require("express");
 const http = require("http");
-const WebSocket = require("ws");
+const OpenAI = require("openai");
 require("dotenv").config();
+
+const { setupConversationRelay } = require("./conversationRelay");
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 const app = express();
 
-// This is the endpoint Twilio will call
+// Twilio webhook
 app.post("/voice", (req, res) => {
   res.set("Content-Type", "text/xml");
 
   res.send(`
 <Response>
-    <Say voice="alice">
-        Hello! Thanks for calling. Our AI receptionist will be available shortly.
-    </Say>
+  <Say voice="alice">
+    Hello! Thanks for calling. Our A.I. receptionist will be with you shortly.
+  </Say>
 </Response>
   `);
 });
 
-// This is just for testing in your browser
+// Browser test
 app.get("/", (req, res) => {
   res.send("AI Receptionist is running!");
 });
 
 const server = http.createServer(app);
 
-const wss = new WebSocket.Server({ server });
-
-wss.on("connection", (ws) => {
-  console.log("WebSocket connected.");
-
-  ws.on("message", (message) => {
-    console.log("Received:", message.toString());
-  });
-
-  ws.on("close", () => {
-    console.log("WebSocket disconnected.");
-  });
-});
+// Start the ConversationRelay WebSocket server
+setupConversationRelay(server);
 
 const PORT = process.env.PORT || 3000;
 
