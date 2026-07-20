@@ -1,13 +1,8 @@
 const express = require("express");
 const http = require("http");
-const OpenAI = require("openai");
 require("dotenv").config();
 
 const { setupConversationRelay } = require("./conversationRelay");
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 const app = express();
 
@@ -27,13 +22,14 @@ app.post("/voice", (req, res) => {
     <ConversationRelay
       url="wss://ai-receptionist-v2-sywe.onrender.com/conversation-relay"
       welcomeGreeting="Thanks for calling CallFlow HVAC. How can we help with your heating or cooling needs today?"
+    />
   </Connect>
 </Response>
   `);
 });
 
 
-// Browser test
+// Health check
 app.get("/", (req, res) => {
   res.send("AI Receptionist is running!");
 });
