@@ -1,14 +1,9 @@
 const WebSocket = require("ws");
 const OpenAI = require("openai");
-const axios = require("axios");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-// Replace this with your n8n webhook URL
-const N8N_WEBHOOK = "https://zenenolivares.app.n8n.cloud/webhook/hvac-lead";
-
 
 function setupConversationRelay(server) {
   const wss = new WebSocket.Server({ noServer: true });
@@ -21,146 +16,108 @@ function setupConversationRelay(server) {
     }
   });
 
-
   wss.on("connection", (ws) => {
     console.log("Twilio ConversationRelay connected");
 
     let conversation = [];
 
-
     ws.on("message", async (message) => {
-      try {
-        const data = JSON.parse(message.toString());
+      const data = JSON.parse(message.toString());
 
-        console.log("Twilio:", data);
+      console.log(data);
 
+      if (data.type === "prompt") {
 
-        if (data.type === "prompt") {
+        conversation.push({
+          role: "user",
+          content: data.voicePrompt
+        });
 
-          conversation.push({
-            role: "user",
-            content: data.voicePrompt
-          });
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `
+You are Sarah, the AI receptionist for CallFlow HVAC.
 
+Your job is to help customers with HVAC problems and collect the information needed for a technician to follow up.
 
-          const response = await openai.chat.completions.create({
+Be friendly, professional, and conversational.
 
-            model: "gpt-4o-mini",
+Start by understanding why they are calling.
 
-            messages: [
-              {
-                role: "system",
-                content: `
-You are Sarah, the AI receptionist for CoolFlow HVAC, a professional HVAC company serving Texas.
+Collect ONLY these details:
 
-Your job:
-- Answer customer calls
-- Qualify HVAC leads
-- Collect customer information
-- Help schedule service
+1. Customer name
+2. Phone number
+3. Service address
+4. Description of the HVAC issue
+5. Urgency (today, this week, general question)
 
-Personality:
-- Friendly
-- Professional
-- Calm
-- Natural
-- Helpful
+Do NOT ask unnecessary questions.
 
-You must collect:
-- Customer name
-- Phone number
-- Address
-- HVAC problem
-- Urgency level
-- Preferred callback time
+Keep calls short and efficient.
 
-Ask only one question at a time.
+Do not sound like a robot.
+Do not mention AI.
+Do not mention internal systems.
 
-Important HVAC questions:
-- Is the AC completely not working?
-- Is there water leaking?
-- Is there a burning smell?
-- How old is the system?
+When you have enough information, say:
 
-Treat these as urgent:
-- AC completely broken during extreme heat
-- Electrical smell
-- Active leaking
-- Safety concerns
+"Perfect, I have everything I need. A member of our team will reach out shortly. Thank you for calling CallFlow HVAC, and have a great day."
 
-Never mention ChatGPT or OpenAI.
+Never say:
+LEAD_COMPLETE
+lead complete
+internal messages
 
-When you have collected all necessary information:
-
-1. Say a normal closing statement to the customer.
-2. Thank them for calling.
-3. Let them know someone will follow up.
-
-Example:
-"Perfect, I have all the information I need. A technician will follow up with you shortly. Thank you for calling CoolFlow HVAC, and have a great day!"
-
-After your closing statement, add the exact phrase LEAD_COMPLETE on a new line for the system to detect.
 `
-              },
+            },
+            ...conversation
+          ]
+        });
 
-              ...conversation
-            ]
+
+        const text = response.choices[0].message.content;
+
+        conversation.push({
+          role: "assistant",
+          content: text
+        });
+
+
+        ws.send(JSON.stringify({
+          type: "text",
+          token: text
+        }));
+
+
+        // Send lead data to n8n after enough information is collected
+        if (
+          conversation.length >= 8 &&
+          text.toLowerCase().includes("everything i need")
+        ) {
+
+          fetch("https://zenenolivares.app.n8n.cloud/webhook/hvac-lead", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              conversation: conversation
+            })
           });
 
+          console.log("Lead sent to n8n");
 
-          const text = response.choices[0].message.content;
-
-
-          conversation.push({
-            role: "assistant",
-            content: text
-          });
-
-
-          // Send AI response back to caller
-          ws.send(JSON.stringify({
-            type: "text",
-            token: text
-          }));
-
-
-          // Send lead to n8n once complete
-          if (text.includes("LEAD_COMPLETE")) {
-
-            try {
-
-              await axios.post(N8N_WEBHOOK, {
-
-                business: "CoolFlow HVAC",
-
-                conversation: conversation,
-
-                timestamp: new Date()
-
-              });
-
-
-              console.log("Lead sent to n8n");
-
-            } catch (error) {
-
-              console.log(
-                "n8n webhook error:",
-                error.message
-              );
-
-            }
-          }
+          setTimeout(() => {
+            ws.send(JSON.stringify({
+              type: "end"
+            }));
+          }, 5000);
 
         }
-
-      } catch(error) {
-
-        console.log(
-          "Conversation error:",
-          error.message
-        );
-
       }
     });
 
@@ -170,10 +127,9 @@ After your closing statement, add the exact phrase LEAD_COMPLETE on a new line f
     });
 
   });
-
 }
 
 
 module.exports = {
   setupConversationRelay,
-};
+};1
