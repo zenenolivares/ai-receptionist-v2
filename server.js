@@ -21,7 +21,7 @@ app.post("/voice", (req, res) => {
   <Connect>
     <ConversationRelay
       url="wss://ai-receptionist-v2-sywe.onrender.com/conversation-relay"
-      welcomeGreeting="Thanks for calling CallFlow HVAC. How can we help with your heating or cooling needs today?"
+      welcomeGreeting="Thanks for calling LeadLock HVAC. How can we help with your heating or cooling needs today?"
     />
   </Connect>
 </Response>
